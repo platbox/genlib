@@ -60,7 +60,7 @@ exponential(Retries, Factor, Timeout, MaxTimeout) when
     {exponential, Retries, Factor, Timeout, MaxTimeout};
 
 exponential(Retries = {max_total_timeout, MaxTotalTimeout}, Factor, Timeout, MaxTimeout) when
-    ?is_max_total_timeout(MaxTotalTimeout) andalso
+    ?is_timeout(MaxTotalTimeout) andalso
     ?is_timeout(Timeout) andalso
     Factor > 0 andalso
     (MaxTimeout =:= infinity orelse ?is_timeout(MaxTimeout))
