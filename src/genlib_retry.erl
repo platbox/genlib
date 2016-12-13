@@ -26,25 +26,25 @@
 
 -define(is_posint(V), (is_integer(V) andalso V > 0)).
 -define(is_retries(V), (V =:= infinity orelse ?is_posint(V))).
--define(is_max_total_timeout(V), (is_integer(V) andalso V >= 0)).
+-define(is_timeout(V), (is_integer(V) andalso V >= 0)).
 
 -spec linear(retries_num() | {max_total_timeout, pos_integer()}, pos_integer()) -> strategy().
 
 linear(Retries, Timeout) when
     ?is_retries(Retries) andalso
-    ?is_posint(Timeout)
+    ?is_timeout(Timeout)
 ->
     {linear, Retries, Timeout};
 
 linear(Retries = {max_total_timeout, MaxTotalTimeout}, Timeout) when
-    ?is_max_total_timeout(MaxTotalTimeout) andalso
-    ?is_posint(Timeout) ->
+    ?is_timeout(MaxTotalTimeout) andalso
+    ?is_timeout(Timeout) ->
     {linear, compute_retries(linear, Retries, Timeout), Timeout}.
 
 -spec exponential(retries_num() | {max_total_timeout, pos_integer()}, number(), pos_integer()) -> strategy().
 
 exponential(Retries, Factor, Timeout) when
-    ?is_posint(Timeout) andalso
+    ?is_timeout(Timeout) andalso
     Factor > 0
 ->
     exponential(Retries, Factor, Timeout, infinity).
@@ -53,17 +53,17 @@ exponential(Retries, Factor, Timeout) when
 
 exponential(Retries, Factor, Timeout, MaxTimeout) when
     ?is_retries(Retries) andalso
-    ?is_posint(Timeout) andalso
+    ?is_timeout(Timeout) andalso
     Factor > 0 andalso
-    (MaxTimeout =:= infinity orelse ?is_posint(MaxTimeout))
+    (MaxTimeout =:= infinity orelse ?is_timeout(MaxTimeout))
 ->
     {exponential, Retries, Factor, Timeout, MaxTimeout};
 
 exponential(Retries = {max_total_timeout, MaxTotalTimeout}, Factor, Timeout, MaxTimeout) when
     ?is_max_total_timeout(MaxTotalTimeout) andalso
-    ?is_posint(Timeout) andalso
+    ?is_timeout(Timeout) andalso
     Factor > 0 andalso
-    (MaxTimeout =:= infinity orelse ?is_posint(MaxTimeout))
+    (MaxTimeout =:= infinity orelse ?is_timeout(MaxTimeout))
 ->
     {exponential, compute_retries(exponential, Retries, {Factor, Timeout, MaxTimeout}), Factor, Timeout, MaxTimeout}.
 
@@ -134,7 +134,7 @@ next_step(Strategy) ->
         {Factor::number(), Timeout::pos_integer(), MaxTimeout::timeout()}
     ) -> non_neg_integer().
 
-compute_retries(linear, {max_total_timeout, MaxTotalTimeout}, Timeout) ->
+compute_retries(linear, {max_total_timeout, MaxTotalTimeout}, Timeout) when Timeout > 0 ->
     trunc(MaxTotalTimeout/Timeout);
 
 compute_retries(exponential, {max_total_timeout, MaxTotalTimeout}, {Factor, Timeout, MaxTimeout}) when MaxTimeout =< Timeout; Factor =:= 1->
