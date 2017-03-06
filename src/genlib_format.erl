@@ -338,8 +338,9 @@ parse_datetime_iso8601_tz(Bin) ->
         <<C, TzBin/binary>> when C =:= $-; C =:= $+ ->
             {[TzHours, TzMinutes], <<>>} = parse_numeric([2, <<$:>>, 2], TzBin),
             {list_to_atom([C]), TzHours, TzMinutes};
+        <<$Z>> ->
+            {'+', 0, 0};
         _ ->
             error(badarg)
     end,
     {Datetime, Timezone}.
-
