@@ -18,6 +18,9 @@
 -export([binarize/2]).
 -export([diff/2]).
 
+-export([get_in/2, get_in/3, mget_in/2]).
+-export([put_in/3]).
+-export([update_in/3, update_in/4]).
 %%
 
 -spec get(any(), map()) -> undefined | term().
@@ -57,8 +60,9 @@ deepput([Key], Value, Map) ->
 deepput([Key | Rest], Value, Map) ->
     maps:put(Key, deepput(Rest, Value, get(Key, Map, #{})), Map).
 
--spec truemap(Function, map()) -> ok when
-    Function :: fun((Key :: any(), Value :: any()) -> {Key :: any(), Value :: any()}).
+-spec truemap(Function, map()) -> #{any() => any()}
+    when
+        Function :: fun((Key :: any(), Value :: any()) -> {Key :: any(), Value :: any()}).
 
 truemap(F, Map = #{}) ->
     maps:fold(fun (K, V, M) -> {Kn, Vn} = F(K, V), maps:put(Kn, Vn, M) end, #{}, Map).
@@ -111,3 +115,66 @@ decrement(N) -> N - 1.
 
 diff(Map, Since) ->
     maps:fold(fun (K, V, M) -> case get(K, M, make_ref()) of V -> maps:remove(K, M); _ -> M end end, Map, Since).
+
+
+%% clojure-style accessors
+
+-spec get_in(KeyPath::[term()], Map::map()) -> term().
+
+get_in(Path, Map) when is_list(Path), is_map(Map) ->
+    lists:foldl(fun maps:get/2, Map, Path).
+
+
+-spec get_in(KeyPath::[term()], Map::map(), Default::term()) -> term().
+
+get_in(Path, Map, Default) when is_list(Path), is_map(Map) ->
+    get_in(make_ref(), Path, Map, Default).
+
+get_in(Ref, _, Ref, Default) -> Default;
+get_in(_, [], Val, _) -> Val;
+get_in(_, _, NotMap, Default) when not is_map(NotMap) -> Default;
+get_in(Ref, [H | T], M, D) -> get_in(Ref, T, maps:get(H, M, Ref), D).
+
+
+-type path() :: [any()] | {[any()], Default::any()}.
+-spec mget_in(Paths, map()) -> [any()] when
+    Paths :: [path()] | #{any() => path()}.
+
+mget_in(Paths, Map) when is_list(Paths), is_map(Map) ->
+    lists:map(fun
+        ({K, D}) -> get_in(K, Map, D);
+        (K) -> get_in(K, Map)
+    end, Paths);
+
+mget_in(Paths, Map) when is_map(Paths), is_map(Map) ->
+    maps:map(fun
+        (_, {Path, D}) -> get_in(Path, Map, D);
+        (_, Path) -> get_in(Path, Map)
+    end, Paths).
+
+
+-spec put_in(KeyPath::[term()], Value::term(), map()) -> map().
+
+put_in(Path, Value, Map) ->
+    deepput(Path, Value, Map).
+
+
+-spec update_in(Key::[any()], Fun :: fun((any()) -> any()), map()) -> map().
+
+update_in([Key], Fun, Map) ->
+    maps:put(Key, Fun(maps:get(Key, Map)), Map);
+
+update_in([Key | Rest], Fun, Map) ->
+    maps:put(Key, update_in(Rest, Fun, get(Key, Map, #{})), Map).
+
+
+-spec update_in(Key::[any()], Fun::fun((any()) -> any()), Init::term(), map()) -> map().
+
+update_in([Key], Fun, Init, Map) ->
+    maps:put(Key, case maps:find(Key, Map) of
+        {ok, Value} -> Fun(Value);
+        _ -> Init
+    end, Map);
+
+update_in([Key | Rest], Fun, Init, Map) ->
+    maps:put(Key, update_in(Rest, Fun, Init, get(Key, Map, #{})), Map).
